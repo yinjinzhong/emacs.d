@@ -75,7 +75,7 @@ See pyim-wbdict's website for the full list of enable functions.")
   (define-key pyim-mode-map (kbd "/") 'my-pyim-clear-and-off)
 
   ;; use western punctuation
-  (setq pyim-punctuation-dict nil)
+  ;; (setq pyim-punctuation-dict nil)
 
   (setq default-input-method "pyim")
 

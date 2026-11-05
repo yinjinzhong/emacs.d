@@ -124,28 +124,28 @@
 
 ;; I don't use any packages from GNU ELPA because I want to minimize
 ;; dependency on 3rd party web site.
-(setq package-archives
-      '(
-        ("gnu" . "https://elpa.gnu.org/packages/")
-        ("melpa" . "https://melpa.org/packages/")
-        ("melpa-stable" . "https://stable.melpa.org/packages/")
-
-        ;; Use either 163 or tsinghua mirror repository when official melpa
-        ;; is slow or shutdown.
-
-        ;; ;; {{ Option 1: 163 mirror repository:
-        ;; ("gnu" . "https://mirrors.163.com/elpa/gnu/")
-        ;; ("melpa" . "https://mirrors.163.com/elpa/melpa/")
-        ;; ("melpa-stable" . "https://mirrors.163.com/elpa/stable-melpa/")
-        ;; ;; }}
-
-        ;; ;; {{ Option 2: tsinghua mirror repository
-        ;; ;; @see https://mirror.tuna.tsinghua.edu.cn/help/elpa/ on usage:
-        ;; ("gnu"   . "http://mirrors.tuna.tsinghua.edu.cn/elpa/gnu/")
-        ;; ("melpa" . "http://mirrors.tuna.tsinghua.edu.cn/elpa/melpa/")
-        ;; ("melpa-stable" . "http://mirrors.tuna.tsinghua.edu.cn/elpa/stable-melpa/")
-        ;; }}
-        ))
+;;(setq package-archives
+;;      '(
+;;        ("gnu" . "https://elpa.gnu.org/packages/")
+;;        ("melpa" . "https://melpa.org/packages/")
+;;        ("melpa-stable" . "https://stable.melpa.org/packages/")
+;;
+;;        ;; Use either 163 or tsinghua mirror repository when official melpa
+;;        ;; is slow or shutdown.
+;;
+;;        ;; ;; {{ Option 1: 163 mirror repository:
+;;        ;; ("gnu" . "https://mirrors.163.com/elpa/gnu/")
+;;        ;; ("melpa" . "https://mirrors.163.com/elpa/melpa/")
+;;        ;; ("melpa-stable" . "https://mirrors.163.com/elpa/stable-melpa/")
+;;        ;; ;; }}
+;;
+;;        ;; ;; {{ Option 2: tsinghua mirror repository
+;;        ;; ;; @see https://mirror.tuna.tsinghua.edu.cn/help/elpa/ on usage:
+;;        ;; ("gnu"   . "http://mirrors.tuna.tsinghua.edu.cn/elpa/gnu/")
+;;        ;; ("melpa" . "http://mirrors.tuna.tsinghua.edu.cn/elpa/melpa/")
+;;        ;; ("melpa-stable" . "http://mirrors.tuna.tsinghua.edu.cn/elpa/stable-melpa/")
+;;        ;; }}
+;;        ))
 
 (defvar my-ask-elpa-mirror t)
 (when (and (not noninteractive) ; no popup in batch mode
@@ -158,7 +158,7 @@ You still need modify `package-archives' in \"init-elpa.el\" to PERMANENTLY use 
           ("melpa-stable" . "https://mirrors.163.com/elpa/stable-melpa/"))))
 
 ;; Un-comment below line if you follow "Install stable version in easiest way"
-;; (setq package-archives '(("myelpa" . "~/myelpa/")))
+(setq package-archives '(("myelpa" . "~/myelpa/")))
 
 (defun my-package-generate-autoloads-hack (pkg-desc pkg-dir)
   "Stop package.el from leaving open autoload files lying around."
