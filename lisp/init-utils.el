@@ -353,15 +353,32 @@ For example, you can '(setq my-media-player-extra-opts \"-fs -ao alsa -vo vdpau\
 (defun my-pclip (str-val)
   "Put STR-VAL into clipboard.
 Supports: Windows/WSL (clip.exe), Cygwin, macOS (via SSH), and xclip."
-  (let* (win64-clip-program
-         ssh-client)
+  (let (win64-clip-program
+        ssh-client)
     (cond
-     ;;  Windows 10+ / WSL: clip.exe (emacsclient need full path of clip.exe)
-     ((and my-wsl-p (setq win64-clip-program (my-get-powershell-exe)))
+     ;;  Windows 10+ / WSL
+     ((and my-wsl-p
+           (setq win64-clip-program (my-get-powershell-exe)))
       (let* ((b64 (base64-encode-string (encode-coding-string str-val 'utf-8) t))
-             (ps-cmd (format "Set-Clipboard -Value ([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('%s')))"
-                             b64)))
-        (call-process win64-clip-program nil nil nil "-NoProfile" "-NonInteractive" "-Command" ps-cmd)))
+             (ps-cmd (concat "$b64 = [Console]::In.ReadToEnd(); "
+                             "$text = [System.Text.Encoding]::UTF8.GetString("
+                             "[System.Convert]::FromBase64String($b64)); "
+                             "Set-Clipboard -Value $text")))
+        (with-temp-buffer
+          (insert b64)
+          (let* ((coding-system-for-write 'us-ascii-unix)
+                 (status
+                  (call-process-region (point-min)
+                                       (point-max)
+                                       win64-clip-program
+                                       nil
+                                       nil
+                                       nil
+                                       "-NoProfile"
+                                       "-NonInteractive"
+                                       "-Command" ps-cmd)))
+            (unless (and (integerp status) (= status 0))
+              (error "PowerShell clipboard failed: %s" status))))))
 
      ;; SSH client on macOS
      ((and (setq ssh-client (getenv "SSH_CLIENT"))

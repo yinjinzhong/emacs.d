@@ -558,7 +558,7 @@ If N > 0 and in js, only occurrences in current N lines are renamed."
   ;; p: previous; n: next; w:hash; W:complete hash; g:nth version; q:quit
   "tm" 'my-git-timemachine
   ;; toggle overview,  @see http://emacs.wordpress.com/2007/01/16/quick-and-dirty-code-folding/
-  "op" 'my-compile
+  "op" 'compile
   "c$" 'org-archive-subtree ; `C-c $'
   ;; org-do-demote/org-do-premote support selected region
   "c<" 'org-do-promote ; `C-c C-<'
@@ -566,7 +566,7 @@ If N > 0 and in js, only occurrences in current N lines are renamed."
   "cxi" 'org-clock-in ; `C-c C-x C-i'
   "cxo" 'org-clock-out ; `C-c C-x C-o'
   "cxr" 'org-clock-report ; `C-c C-x C-r'
-  "qq" 'my-multi-purpose-grep
+  "qq" 'fastctags-grep
   "dd" 'fastctags-grep-current-directory
   "dc" 'my-grep-pinyin-in-current-directory
   "dg" 'my-grep-pinyin-in-project
