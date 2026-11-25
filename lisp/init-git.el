@@ -66,7 +66,8 @@
     (git-gutter:set-start-revision parent)
     (message "git-gutter:set-start-revision HEAD^")))
 
-(defvar my-prefer-lightweight-magit t)
+(defvar my-prefer-lightweight-magit nil
+  "Speed up `magit-status'.")
 (defun my-hint-untracked-files ()
   "If untracked files and committed files share same extension, warn users."
 
@@ -89,6 +90,8 @@
 
 (with-eval-after-load 'magit
   ;; {{speed up magit, @see https://jakemccrary.com/blog/2020/11/14/speeding-up-magit/
+  ;; Setting `magit-refresh-verbose' to t causes Magit to print useful output
+  ;; to *Messages* buffer. It shows how many seconds each step of `magit-status' takes.
   (when my-prefer-lightweight-magit
     (remove-hook 'magit-status-sections-hook #'magit-insert-tags-header)
     (remove-hook 'magit-status-sections-hook #'magit-insert-status-headers)
@@ -379,7 +382,7 @@ If USER-SELECT-BRANCH is not nil, rebase on the tag or branch selected by user."
 (defun my-git-find-file-in-commit (&optional level)
   "Find file in previous commit with LEVEL.
 If LEVEL > 0, find file in previous LEVEL commit."
-  (interactive "p")
+  (interactive "P")
   (my-ensure 'magit)
   (let* ((rev (concat "HEAD" (if (and level (> level 0)) (make-string level ?^))))
          (pretty (string-trim (shell-command-to-string (format "git --no-pager log %s --oneline --no-walk" rev))))
@@ -413,12 +416,6 @@ If LEVEL > 0, find file in previous LEVEL commit."
         (setq cmd (format "%s -m %s" cmd (shell-quote-argument msg))))
       (shell-command cmd))))
 
-(defun my-git-current-branch ()
-  "Show current branch name."
-  (interactive)
-  (message "Git current branch: %s"
-           (string-trim (shell-command-to-string "git branch --show-current"))))
-
 (defun my-git-find-file ()
   "Find file in the current Git repository (all files)."
   (interactive)
@@ -434,7 +431,7 @@ If LEVEL > 0, find file in previous LEVEL commit."
   "Git grep in project."
   (interactive)
   (let ((fastctags-use-git-grep-p t))
-    (fastctags-grep (my-selected-str))))
+    (call-interactively #'fastctags-grep)))
 
 (provide 'init-git)
 ;;; init-git.el ends here

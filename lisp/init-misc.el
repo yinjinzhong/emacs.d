@@ -1,5 +1,7 @@
 ;; -*- coding: utf-8; lexical-binding: t; -*-
 
+;;; Code:
+
 ;; Avoid potential lag:
 ;; https://emacs.stackexchange.com/questions/28736/emacs-pointcursor-movement-lag/28746
 ;; `next-line' triggers the `format-mode-line' which triggers `projectile-project-name'
@@ -73,7 +75,6 @@
 ;; @see http://www.emacswiki.org/emacs/SavePlace
 (save-place-mode 1)
 
-;; {{ find-file-in-project (ffip)
 (with-eval-after-load 'find-file-in-project
   (defun my-search-git-reflog-code ()
     (let* ((default-directory (my-git-root-dir)))
@@ -81,18 +82,6 @@
                                        (read-string "Regex: ")))))
   (push 'my-search-git-reflog-code ffip-diff-backends)
   (setq ffip-match-path-instead-of-filename t))
-
-(defun my-neotree-project-dir ()
-  "Open NeoTree using the git root."
-  (interactive)
-  (let* ((project-dir (ffip-get-project-root-directory))
-         (file-name (buffer-file-name)))
-    (if project-dir
-        (progn
-          (neotree-dir project-dir)
-          (neotree-find file-name))
-      (message "Could not find git project root."))))
-;; }}
 
 ;; {{ dictionary setup
 (defun my-lookup-dict-org ()
@@ -168,25 +157,7 @@ FN checks these characters belong to normal word characters."
     rlt))
 
 (with-eval-after-load 'elec-pair
-  ;; {{ @see https://debbugs.gnu.org/cgi/bugreport.cgi?bug=55340
-  ;; `new-line-indent` disables `electric-indent-mode'
-  (defun my-electric-pair-open-newline-between-pairs-psif-hack (orig-func &rest args)
-    (ignore orig-func args)
-    (when (and (if (functionp electric-pair-open-newline-between-pairs)
-                   (funcall electric-pair-open-newline-between-pairs)
-                 electric-pair-open-newline-between-pairs)
-               (eq last-command-event ?\n)
-               (< (1+ (point-min)) (point) (point-max))
-               (eq (save-excursion
-                     (skip-chars-backward "\t\s")
-                     (char-before (1- (point))))
-                   (matching-paren (char-after))))
-      (save-excursion (newline-and-indent 1))))
-  (advice-add 'electric-pair-open-newline-between-pairs-psif
-              :around
-              #'my-electric-pair-open-newline-between-pairs-psif-hack)
-  ;; }}
-  (setq electric-pair-inhibit-predicate 'my-electric-pair-inhibit))
+  (setq electric-pair-inhibit-predicate #'my-electric-pair-inhibit))
 ;; }}
 
 ;; {{
@@ -226,17 +197,21 @@ In each rule, 1st item is default directory, 2nd item is the shell command.")
 (my-run-with-idle-timer 1 #'fastctags-auto-setup)
 
 ;;; {{ display long lines in truncated style (end line with $)
-(defun my-truncate-lines-setup ()
-  (toggle-truncate-lines 1))
-(add-hook 'grep-mode-hook 'my-truncate-lines-setup)
+(defun my-long-lines-setup ()
+  "Set up long lines."
+  (setq-local truncate-lines t)
+  (setq-local truncate-partial-width-windows t)
+  (setq-local long-line-threshold 200)
+  (setq-local large-hscroll-threshold 300))
+(add-hook 'grep-mode-hook 'my-long-lines-setup)
 ;; }}
 
 ;; turn on auto-fill-mode, don't use `text-mode-hook' because for some
 ;; mode (org-mode for example), this will make the exported document
 ;; ugly!
 ;; (add-hook 'markdown-mode-hook 'turn-on-auto-fill)
-(add-hook 'change-log-mode-hook 'turn-on-auto-fill)
-(add-hook 'cc-mode-hook 'turn-on-auto-fill)
+(add-hook 'change-log-mode-hook #'turn-on-auto-fill)
+(add-hook 'cc-mode-hook #'turn-on-auto-fill)
 
 ;; some project prefer tab, so be it
 ;; @see http://stackoverflow.com/questions/69934/set-4-space-indent-in-emacs-in-text-mode
@@ -291,7 +266,7 @@ In each rule, 1st item is default directory, 2nd item is the shell command.")
   (let* ((msg (which-function)))
     (when msg
       (popup-tip msg)
-      (copy-yank-str msg))))
+      (my-copy-yank-str msg))))
 ;; }}
 
 ;; {{ music
@@ -300,7 +275,7 @@ In each rule, 1st item is default directory, 2nd item is the shell command.")
   (interactive)
   (let* ((msg (car (my-nonempty-lines (shell-command-to-string "mpc")))))
     (message msg)
-    (copy-yank-str msg)))
+    (my-copy-yank-str msg)))
 
 (defun mpc-next-prev-song (&optional previous)
   "Select PREVIOUS song if it's not nil; or else select next song."
@@ -317,7 +292,7 @@ In each rule, 1st item is default directory, 2nd item is the shell command.")
     (when (eq major-mode 'compilation-mode)
       (my-ensure 'ansi-color)
       (ansi-color-apply-on-region compilation-filter-start (point-max))))
-  (add-hook 'compilation-filter-hook 'my-colorize-compilation-buffer))
+  (add-hook 'compilation-filter-hook #'my-colorize-compilation-buffer))
 ;; }}
 
 (defun my-minibuffer-setup-hook ()
@@ -342,27 +317,25 @@ So it's at the top of clipboard manager."
 (defun my-extract-list-from-package-json ()
   "Extract package list from package.json."
   (interactive)
-  (let* ((str (my-use-selected-string-or-ask)))
-    (setq str (replace-regexp-in-string ":.*$\\|\"" "" str))
+  (let* ((str (replace-regexp-in-string ":.*$\\|\"" "" (my-use-selected-string-or-ask))))
     ;; join lines
-    (setq str (replace-regexp-in-string "[\r\n \t]+" " " str))
-    (copy-yank-str str)
+    (my-copy-yank-str (replace-regexp-in-string "[\r\n \t]+" " " str))
     (message "%s => clipboard & yank ring" str)))
 
-(defun my-insert-absolute-path()
+(defun my-copy-absolute-path()
   "Relative path to full path."
   (interactive)
   (let* ((str (my-use-selected-string-or-ask "Input relative path:"))
          (path (file-truename str)))
-    (copy-yank-str path)
+    (my-copy-yank-str path)
     (message "%s => clipboard & yank ring" path)))
 
-(defun my-insert-relative-path()
+(defun my-copy-relative-path()
   "Full path to relative path."
   (interactive)
   (let* ((str (my-use-selected-string-or-ask "Input absolute path:"))
          (path (file-relative-name str)))
-    (copy-yank-str path)
+    (my-copy-yank-str path)
     (message "%s => clipboard & yank ring" path)))
 
 ;; indention management
@@ -385,27 +358,17 @@ So it's at the top of clipboard manager."
         (setq n (length kill-ring)))
     (let* ((rlt (mapconcat 'identity (cl-subseq kill-ring 0 n) "|")))
       (setq rlt (replace-regexp-in-string "(" "\\\\(" rlt))
-      (copy-yank-str rlt)
+      (my-copy-yank-str rlt)
       (message (format "%s => kill-ring&clipboard" rlt)))))
 ;; }}
 
-
-;; {{ emmet (auto-complete html tags)
-;; @see https://github.com/rooney/zencoding for original tutorial
-;; @see https://github.com/smihica/emmet for new tutorial
-;; C-j or C-return to expand the line
-(add-hook 'sgml-mode-hook 'emmet-mode) ; `sgml-mode` is parent of `html-mode'
-(add-hook 'web-mode-hook 'emmet-mode)
-(add-hook 'css-mode-hook  'emmet-mode)
-(add-hook 'rjsx-mode-hook  'emmet-mode)
-;; }}
 
 (defun sgml-mode-hook-setup ()
   "Sgml/html mode setup."
   ;; let `web-mode' handle indentation by itself..
   ;; It does not derives from `sgml-mode'.
   (setq-local indent-region-function 'sgml-pretty-print))
-(add-hook 'sgml-mode-hook 'sgml-mode-hook-setup)
+(add-hook 'sgml-mode-hook #'sgml-mode-hook-setup)
 
 
 ;; {{ xterm
@@ -415,7 +378,7 @@ So it's at the top of clipboard manager."
   (unless window-system
     ;; Mouse in a terminal (Use shift to paste with middle button)
     (xterm-mouse-mode 1)))
-(add-hook 'after-make-frame-functions 'my-run-after-make-frame-hook)
+(add-hook 'after-make-frame-functions #'my-run-after-make-frame-hook)
 ;; }}
 
 ;; {{ check attachments
@@ -450,7 +413,7 @@ So it's at the top of clipboard manager."
     (unless
         (y-or-n-p "The message suggests that you may want to attach something, but no attachment is found.  Send anyway?")
       (error "It seems that an attachment is needed, but none was found.  Aborting sending!"))))
-(add-hook 'message-send-hook 'my-message-pre-send-check-attachment)
+(add-hook 'message-send-hook #'my-message-pre-send-check-attachment)
 ;; }}
 
 (defun my-kill-all-but-current-buffer ()
@@ -467,21 +430,21 @@ So it's at the top of clipboard manager."
   (set-syntax-table (let* ((table (make-syntax-table)))
                       (modify-syntax-entry ?/ "." table)
                       table)))
-(add-hook 'minibuffer-inactive-mode-hook 'my-minibuffer-inactive-mode-hook-setup)
+(add-hook 'minibuffer-inactive-mode-hook #'my-minibuffer-inactive-mode-hook-setup)
 
 ;; {{ vc-msg
-(defun vc-msg-hook-setup (vcs-type commit-info)
+(defun my-vc-msg-hook-setup (vcs-type commit-info)
   "Set up vc with VCS-TYPE and COMMIT-INFO."
   ;; copy commit id to clipboard
   (ignore vcs-type)
   (my-pclip (plist-get commit-info :id)))
-(add-hook 'vc-msg-hook 'vc-msg-hook-setup)
+(add-hook 'vc-msg-hook #'my-vc-msg-hook-setup)
 
-(defun vc-msg-show-code-setup ()
+(defun my-vc-msg-show-code-setup ()
   "Use `ffip-diff-mode' instead of `diff-mode'."
   (my-ensure 'find-file-in-project)
   (ffip-diff-mode))
-(add-hook 'vc-msg-show-code-hook 'vc-msg-show-code-setup)
+(add-hook 'vc-msg-show-code-hook #'my-vc-msg-show-code-setup)
 ;; }}
 
 ;; {{
@@ -547,7 +510,7 @@ ARG is ignored."
                                 search-ring
                                 regexp-search-ring))
 (setq session-save-file-coding-system 'utf-8)
-(add-hook 'after-init-hook 'session-initialize)
+(add-hook 'after-init-hook #'session-initialize)
 ;; }}
 
 ;; {{ compile setup
@@ -621,13 +584,6 @@ If the shell is already opened in some buffer, switch to that buffer."
   (setq auto-revert-verbose nil)
   (my-run-with-idle-timer 4 #'global-auto-revert-mode))
 
-;;----------------------------------------------------------------------------
-;; Don't disable narrowing commands
-;;----------------------------------------------------------------------------
-(put 'narrow-to-region 'disabled nil)
-(put 'narrow-to-page 'disabled nil)
-(put 'narrow-to-defun 'disabled nil)
-
 ;; my screen is tiny, so I use minimum eshell prompt
 (with-eval-after-load 'eshell
   (setq eshell-prompt-function
@@ -644,19 +600,6 @@ If the shell is already opened in some buffer, switch to that buffer."
   "Length of a selected region."
   (interactive)
   (message (format "%d" (- (region-end) (region-beginning)))))
-
-;; show ascii table
-(defun my-ascii-table ()
-  "Print the ascii table."
-  (interactive)
-  (switch-to-buffer "*ASCII*")
-  (erase-buffer)
-  (insert (format "ASCII characters up to number %d.\n" 254))
-  (let* ((i 0))
-    (while (< i 254)
-      (setq i (+ i 1))
-      (insert (format "%4d %c\n" i i))))
-  (goto-char (point-min)))
 
 ;; {{ unique lines
 ;; https://gist.github.com/ramn/796527
@@ -676,9 +619,7 @@ Then insert it as a local file link in `org-mode'."
 
 (defun my-dired-copy-filename-as-kill-hack (&optional arg)
   "Copy file name/path from Dired buffer into clipboard.
-If ARG is not nil, copy full path.
-Press \"w\" to copy file name.
-Press \"C-u 0 w\" to copy full path."
+If ARG is not nil, copy full path."
   (ignore arg)
   (let ((str (current-kill 0)))
     (my-pclip str)
@@ -745,7 +686,7 @@ version control automatically."
 ;; midnight mode purges buffers which haven't been displayed in 3 days
 (my-run-with-idle-timer 4 #'midnight-mode)
 
-(defun cleanup-buffer-safe ()
+(defun my-cleanup-buffer-safe ()
   "Perform a bunch of safe operations on the whitespace content of a buffer.
 Does not indent buffer, because it is used for a `before-save-hook', and that
 might be bad."
@@ -780,25 +721,24 @@ might be bad."
 ;; {{ use tmr for pomodoro
 (with-eval-after-load 'tmr
   (when my-wsl-p
-    (remove-hook 'tmr-timer-finished-functions
-                 #'tmr-notification-notify))
+    (remove-hook 'tmr-timer-finished-functions #'tmr-notification-notify))
   ;; Show timer in the mode line
   (tmr-mode-line-mode 1))
 ;; }}
 
 ;; {{ epub setup
-(defun nov-mode-hook-setup ()
+(defun my-nov-mode-hook-setup ()
   "Set up of `nov-mode'."
   (local-set-key (kbd "d")
-		 (lambda ()
-		   (interactive)
+         (lambda ()
+           (interactive)
            ;; go to end of word to workaround `nov-mode' bug
-		   (forward-word)
-		   (forward-char -1)
-		   (my-dict-complete-definition)))
-  (local-set-key (kbd ";") 'my-hydra-ebook/body)
-  (local-set-key (kbd "w") 'mybigword-big-words-in-current-window))
-(add-hook 'nov-mode-hook 'nov-mode-hook-setup)
+           (forward-word)
+           (forward-char -1)
+           (my-dict-complete-definition)))
+  (local-set-key (kbd ";") #'my-hydra-ebook/body)
+  (local-set-key (kbd "w") #'mybigword-big-words-in-current-window))
+(add-hook 'nov-mode-hook #'my-nov-mode-hook-setup)
 
 (with-eval-after-load 'nov
   (defun my-nov-content-unique-identifier (orig-fun content)
@@ -831,14 +771,6 @@ might be bad."
         (t
          (error-message-string err))))))
   (advice-add 'nov-content-unique-identifier :around #'my-nov-content-unique-identifier))
-;; }}
-
-;; {{ octave
-(defun octave-mode-hook-setup ()
-  "Set up of `octave-mode'."
-  (setq-local comment-start "%")
-  (setq-local comment-add 0))
-(add-hook 'octave-mode-hook 'octave-mode-hook-setup)
 ;; }}
 
 ;; {{ wgrep setup
@@ -954,7 +886,7 @@ might be bad."
 
 
 ;; {{ markdown
-(defun markdown-mode-hook-setup ()
+(defun my-markdown-mode-hook-setup ()
   "Set up markdown."
   ;; makes markdown tables saner via `orgtbl-mode'
   ;; Stolen from http://stackoverflow.com/a/26297700
@@ -965,11 +897,11 @@ might be bad."
     (save-excursion
       (goto-char (point-min))
       (while (search-forward "-+-" nil t) (replace-match "-|-"))))
-  (add-hook 'after-save-hook 'cleanup-org-tables nil 'make-it-local)
+  (add-hook 'after-save-hook #'cleanup-org-tables nil 'make-it-local)
   (orgtbl-mode 1) ; enable key bindings
   ;; don't wrap lines because there is table in `markdown-mode'
   (setq truncate-lines t))
-(add-hook 'markdown-mode-hook 'markdown-mode-hook-setup)
+(add-hook 'markdown-mode-hook #'my-markdown-mode-hook-setup)
 ;; }}
 
 ;; {{ pdf
@@ -1047,12 +979,12 @@ Org node property PDF_PAGE_OFFSET is used to calculate physical page number."
 (setq wc-idle-wait most-positive-fixnum)
 ;; minor mode sets up hotkey&modeline&timer
 ;; I don't use any of them
-(unless (featurep 'init-modeline) (add-hook 'text-mode-hook 'wc-mode))
+(unless (featurep 'init-modeline) (add-hook 'text-mode-hook #'wc-mode))
 
 (defvar my-lazy-before-save-timer nil "Timer for `before-save-hook'.")
 (defvar  my-lazy-before-save-update-interval 16
   "The interval (seconds) routines happen in `before-save-hook'.")
-(defun lazy-before-save-hook-setup ()
+(defun my-lazy-before-save-hook-setup ()
   "Do something when saving current buffer.
 It's also controlled by `my-lazy-before-save-timer'."
   (when (or (not my-lazy-before-save-timer)
@@ -1065,11 +997,11 @@ It's also controlled by `my-lazy-before-save-timer'."
       (setq wc-buffer-stats (wc-mode-update))
       (when (featurep 'init-modeline)
         (setq my-extra-mode-line-info wc-buffer-stats)))))
-(add-hook 'before-save-hook 'lazy-before-save-hook-setup)
+(add-hook 'before-save-hook #'my-lazy-before-save-hook-setup)
 ;; }}
 
 (defvar my-gdb-history-file "~/.gdb_history")
-(defun gud-gdb-mode-hook-setup ()
+(defun my-gud-gdb-mode-hook-setup ()
   "GDB setup."
 
   ;; Content of my "~/.gdbinit":
@@ -1080,7 +1012,7 @@ It's also controlled by `my-lazy-before-save-timer'."
              (file-exists-p my-gdb-history-file))
     (setq comint-input-ring-file-name my-gdb-history-file)
     (comint-read-input-ring t)))
-(add-hook 'gud-gdb-mode-hook 'gud-gdb-mode-hook-setup)
+(add-hook 'gud-gdb-mode-hook #'my-gud-gdb-mode-hook-setup)
 
 ;; {{ helpful (https://github.com/Wilfred/helpful)
 ;; Note that the built-in `describe-function' includes both functions
@@ -1286,14 +1218,14 @@ MATCH is optional tag match."
     ;; (turn-on-eldoc-mode)
     ;; show trailing spaces in a programming mod
     (setq show-trailing-whitespace t)))
-(add-hook 'prog-mode-hook 'my-generic-prog-mode-hook-setup)
+(add-hook 'prog-mode-hook #'my-generic-prog-mode-hook-setup)
 
 ;; {{ lua
 (defun my-lua-mode-setup ()
   "Set up lua script."
   ;; extract event handler
   (push '("Handler" "^[ \t]*\\([a-zA-Z_.0-9]+\\):Connect(function" 1) imenu-generic-expression))
-(add-hook 'lua-mode-hook 'my-lua-mode-setup)
+(add-hook 'lua-mode-hook #'my-lua-mode-setup)
 
 (with-eval-after-load 'apheleia
   ;; 1. Define the formatter command
@@ -1346,20 +1278,26 @@ If N is 2, list files in my recent 20 commits."
   (interactive "P")
   (my-ensure 'recentf)
   (my-ensure 'project)
-  (unless n (setq n 0))
   (recentf-mode 1)
-  (let* ((files (mapcar #'substring-no-properties recentf-list))
-         (root (ffip-project-root))
-         (root-dir (if root (file-truename root)))
-         (hint "Recent files: ")
-         f)
+  (let* ((files recentf-list)
+         hint)
     (cond
-     ((and (eq n 1) root-dir)
-      (setq hint (format "Recent files in %s: " root-dir))
-      (setq files (delq nil (delete-dups (mapcar (lambda (f) (my-path-in-directory-p f root-dir)) files)))))
+     ((eq n 1)
+      (let* ((root (ffip-project-root))
+             (root-dir (if root (file-truename root))))
+        (setq hint (format "Recent files in %s: " root-dir))
+        (setq files
+              (delete-dups
+               (cl-remove-if-not
+                (lambda (f)
+                  (file-in-directory-p f root-dir))
+                files)))))
      ((eq n 2)
-      (setq hint (format "Files in recent Git commits: "))
-      (setq files (my-git-recent-files))))
+      (setq hint (format "Files in recent 10 days Git commits: "))
+      (setq files (my-git-recent-files)))
+
+     (t
+      (setq hint "Recent files: ")))
 
     (unless (string-empty-p (setq f (completing-read hint files)))
       ;; return file buffer if possible
@@ -1442,6 +1380,93 @@ If it's on, disable it and restore single window."
 ;; }}
 
 (electric-pair-mode 1)
+
+;; {{ simple-httpd setup
+;; per project setup may be better
+;; (setq httpd-root "/var/www")
+(setq httpd-port 4444)
+(defun httpd-restart-now ()
+  "Restart http server."
+  (interactive)
+  (httpd-stop)
+  (httpd-start)
+  (message "http://localhost:%d/ at %s restarted"
+           httpd-port httpd-root))
+
+(defun httpd-restart-at-default-directory ()
+  "Restart http server at default directory."
+  (interactive)
+  (setq httpd-root default-directory)
+  (httpd-restart-now))
+;; }}
+
+;; {{ web
+(defun my-web-mode-hook-setup ()
+  "Set up `web-mode'."
+  (unless (my-buffer-file-temp-p)
+    (setq-local wucuo-flyspell-check-doublon nil)
+    ;; `web-mode-yasnippet-exit-hook' indents text generated by yasnippet
+    ;; I prefer controlling indention manually
+    (remove-hook 'yas-after-exit-snippet-hook #'web-mode-yasnippet-exit-hook t)))
+(add-hook 'web-mode-hook #'my-web-mode-hook-setup)
+
+(with-eval-after-load 'web-mode
+  (setq web-mode-enable-auto-closing t) ; enable auto close tag in text-mode
+  (setq web-mode-enable-auto-pairing t)
+  (setq web-mode-auto-close-style 2)
+  (setq web-mode-enable-css-colorization t))
+;; }}
+
+
+;; {{ Smart capitalization, case conversion, and punctuation correction.
+(defun my-convert-punctuation (rg rp)
+  "Look for regexp RG around point, and replace with RP.
+Only applies to `text-mode'."
+  (let ((f "\\(%s\\)\\(%s\\)")
+        (space "[[:blank:]\n\r]*"))
+    (when (and (derived-mode-p 'text-mode)
+               (or (looking-at (format f space rg))
+                   (looking-back (format f rg space)
+                                 (max (point-min) (- (point) 100)))))
+      (replace-match rp nil nil nil 1))))
+
+(defun my-call-subword-cmd (fn)
+  "Run function FN."
+  (my-ensure 'subword)
+  (call-interactively fn))
+
+(defun my-capitalize ()
+  "Capitalize region or word.
+Also converts commas to full stops, and removes
+an extra space at beginning of line."
+  (interactive)
+  (my-convert-punctuation "," ".")
+  (if (use-region-p)
+      (call-interactively #'capitalize-region)
+    (when (looking-at "^ ")
+      (delete-char 1))
+    (my-call-subword-cmd #'subword-capitalize)))
+
+(defun my-downcase ()
+  "Downcase region or word.
+Also converts full stops to commas."
+  (interactive)
+  (my-convert-punctuation "\\." ",")
+  (if (use-region-p)
+      (call-interactively #'downcase-region)
+    (my-call-subword-cmd #'subword-downcase)))
+
+(defun my-upcase ()
+  "Upcase region or word."
+  (interactive)
+  (if (use-region-p)
+      (call-interactively #'upcase-region)
+    (my-call-subword-cmd #'subword-upcase)))
+
+(global-set-key (kbd "M-c") #'my-capitalize)
+(global-set-key (kbd "M-l") #'my-downcase)
+(global-set-key (kbd "M-u") #'my-upcase)
+;; }}
 
 (provide 'init-misc)
 ;;; init-misc.el ends here
